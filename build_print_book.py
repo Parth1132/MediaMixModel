@@ -1,0 +1,963 @@
+"""
+build_print_book.py
+Generates a perfectly balanced 9-page executive print-ready PDF where each page
+is an exact self-contained chapter with formula, explanation, table, visual, and business takeaway.
+No raw LaTeX code strings; pristine typography and genuine mathematical fractions.
+"""
+
+import os
+import subprocess
+import pymupdf
+
+html_path = r"D:\MediaMixModel\guide.html"
+pdf_path = r"D:\MediaMixModel\The_Definitive_Guide_to_Media_Mix_Modeling.pdf"
+pages_dir = r"D:\MediaMixModel\pages"
+os.makedirs(pages_dir, exist_ok=True)
+
+html_content = r"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The Definitive Guide to Media Mix Modeling (MMM)</title>
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 12mm 12mm 14mm 12mm;
+    @top-right {
+      content: "The Definitive Guide to Media Mix Modeling (MMM)";
+      font-size: 7pt;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #94A3B8;
+      font-weight: 600;
+    }
+    @bottom-center {
+      content: "Confidential • Local Disk D: MediaMixModel Blueprint";
+      font-size: 7pt;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #94A3B8;
+    }
+  }
+
+  * {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #1E293B;
+    background-color: #FFFFFF;
+    line-height: 1.42;
+    font-size: 8.8pt;
+    margin: 0;
+    padding: 0;
+  }
+
+  .chapter-page {
+    page-break-after: always;
+    break-after: page;
+    height: 268mm;
+    max-height: 268mm;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+
+  .last-page {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  /* Headings */
+  h1 {
+    font-size: 15.5pt;
+    color: #0F172A;
+    font-weight: 800;
+    line-height: 1.15;
+    border-bottom: 2px solid #2563EB;
+    padding-bottom: 4px;
+    margin: 0 0 8px 0;
+  }
+
+  h2 {
+    font-size: 10.5pt;
+    color: #1E3A8A;
+    margin: 6px 0 4px 0;
+    border-left: 3.5px solid #2563EB;
+    padding-left: 6px;
+    font-weight: 700;
+  }
+
+  p {
+    margin: 0 0 6px 0;
+    text-align: justify;
+  }
+
+  /* Callout Cards */
+  .card {
+    border-radius: 6px;
+    padding: 7px 10px;
+    margin-bottom: 7px;
+  }
+  
+  .card-intuition {
+    background-color: #EFF6FF;
+    border: 1px solid #BFDBFE;
+    border-left: 4.5px solid #2563EB;
+  }
+  .card-intuition-title {
+    font-size: 8.6pt;
+    font-weight: 800;
+    color: #1E40AF;
+    margin-bottom: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+
+  .card-business {
+    background-color: #ECFDF5;
+    border: 1px solid #A7F3D0;
+    border-left: 4.5px solid #059669;
+  }
+  .card-business-title {
+    font-size: 8.6pt;
+    font-weight: 800;
+    color: #065F46;
+    margin-bottom: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+
+  .card-warning {
+    background-color: #FEF2F2;
+    border: 1px solid #FECACA;
+    border-left: 4.5px solid #DC2626;
+  }
+  .card-warning-title {
+    font-size: 8.6pt;
+    font-weight: 800;
+    color: #991B1B;
+    margin-bottom: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+
+  /* Formula Displays */
+  .formula-box {
+    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+    color: #F8FAFC;
+    border-radius: 6px;
+    padding: 8px 14px;
+    margin: 5px 0 7px 0;
+  }
+  .formula-label {
+    font-size: 6.8pt;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #38BDF8;
+    margin-bottom: 3px;
+  }
+  .formula-display {
+    font-size: 11pt;
+    font-weight: 700;
+    font-family: "Courier New", Courier, monospace;
+    text-align: center;
+    padding: 2px 0;
+    letter-spacing: 0.3px;
+  }
+  .formula-display .hl-sales { color: #38BDF8; }
+  .formula-display .hl-base { color: #94A3B8; }
+  .formula-display .hl-media { color: #4ADE80; }
+  .formula-display .hl-control { color: #FBBF24; }
+  .formula-display .hl-noise { color: #F87171; }
+  
+  .formula-subtitle {
+    font-size: 7.2pt;
+    color: #CBD5E1;
+    text-align: center;
+    margin-top: 2px;
+    font-style: italic;
+  }
+
+  /* Fraction styling in CSS */
+  .math-fraction {
+    display: inline-flex;
+    flex-direction: column;
+    vertical-align: middle;
+    text-align: center;
+    padding: 0 4px;
+  }
+  .math-numerator {
+    border-bottom: 1.5px solid #F8FAFC;
+    padding-bottom: 1px;
+    color: #4ADE80;
+  }
+  .math-denominator {
+    padding-top: 1px;
+    color: #F8FAFC;
+  }
+
+  /* Tables */
+  table.decoder-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 4px 0 7px 0;
+    font-size: 8pt;
+  }
+  table.decoder-table th {
+    background-color: #1E293B;
+    color: #FFFFFF;
+    text-align: left;
+    padding: 4px 6px;
+    font-weight: 700;
+    font-size: 7.2pt;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  table.decoder-table td {
+    padding: 4px 6px;
+    border-bottom: 1px solid #E2E8F0;
+    vertical-align: top;
+    line-height: 1.35;
+  }
+  table.decoder-table tr:nth-child(even) td {
+    background-color: #F8FAFC;
+  }
+  .symbol-tag {
+    font-family: "Courier New", Courier, monospace;
+    font-weight: 800;
+    background-color: #EFF6FF;
+    color: #1D4ED8;
+    padding: 1px 4px;
+    border-radius: 3px;
+    border: 1px solid #BFDBFE;
+    display: inline-block;
+    font-size: 7.8pt;
+  }
+
+  /* Figures */
+  .figure-container {
+    text-align: center;
+    margin: 4px 0 6px 0;
+  }
+  .figure-container img {
+    max-width: 99%;
+    max-height: 175px;
+    object-fit: contain;
+    border-radius: 5px;
+    border: 1px solid #E2E8F0;
+  }
+  .figure-caption {
+    font-size: 7.4pt;
+    color: #64748B;
+    font-weight: 700;
+    margin-top: 2px;
+  }
+
+  /* Cover specifics */
+  .cover-header {
+    margin-bottom: 16px;
+  }
+  .cover-badge {
+    display: inline-block;
+    background-color: #1E293B;
+    color: #38BDF8;
+    padding: 3px 10px;
+    border-radius: 14px;
+    font-size: 7.5pt;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 12px;
+  }
+  .cover-title {
+    font-size: 24pt;
+    font-weight: 900;
+    color: #0F172A;
+    line-height: 1.15;
+    margin-bottom: 6px;
+    border: none;
+    padding: 0;
+  }
+  .cover-subtitle {
+    font-size: 11.5pt;
+    color: #2563EB;
+    font-weight: 600;
+    margin-bottom: 18px;
+    line-height: 1.35;
+  }
+  .cover-summary {
+    background-color: #F8FAFC;
+    border-left: 5px solid #2563EB;
+    padding: 12px 16px;
+    border-radius: 5px;
+    font-size: 9.2pt;
+    line-height: 1.5;
+    color: #334155;
+    margin-bottom: 20px;
+  }
+  .cover-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .cover-stat-box {
+    background: #FFFFFF;
+    border: 1.5px solid #E2E8F0;
+    padding: 10px;
+    border-radius: 6px;
+    text-align: center;
+  }
+  .cover-stat-num {
+    font-size: 15pt;
+    font-weight: 900;
+    color: #0F172A;
+  }
+  .cover-stat-label {
+    font-size: 7pt;
+    color: #64748B;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-top: 3px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ==========================================================================
+     PAGE 1: COVER & EXECUTIVE BRIEFING
+     ========================================================================== -->
+<div class="chapter-page">
+  <div class="cover-header">
+    <div class="cover-badge">Executive Engineering & Science Blueprint</div>
+    <div class="cover-title">THE DEFINITIVE GUIDE TO MEDIA MIX MODELING (MMM)</div>
+    <div class="cover-subtitle">From Everyday Intuition to Econometric Equations & Profit-Maximizing Budget Allocation</div>
+  </div>
+
+  <div class="cover-summary">
+    <strong>Executive Briefing:</strong> In an era of strict privacy regulations (GDPR, CCPA), Apple's App Tracking Transparency (ATT), and the death of third-party cookies, traditional "last-click" digital tracking has collapsed. Marketing Mix Modeling (MMM) has re-emerged as the gold standard for global enterprise measurement.<br><br>
+    This guide bridges the gap between <strong>rigorous mathematical econometrics</strong> (Google Meridian, Meta Robyn, and PyMC-Marketing) and <strong>effortless business intuition</strong>. Every equation includes a plain-English symbol breakdown, an intuitive real-world analogy, and actionable guidance for executive decision-making.
+  </div>
+
+  <div class="cover-grid">
+    <div class="cover-stat-box">
+      <div class="cover-stat-num">100%</div>
+      <div class="cover-stat-label">Privacy-Safe (Zero Cookies/IDFA)</div>
+    </div>
+    <div class="cover-stat-box">
+      <div class="cover-stat-num">+15% to +25%</div>
+      <div class="cover-stat-label">Average Profit Lift via SLSQP</div>
+    </div>
+    <div class="cover-stat-box">
+      <div class="cover-stat-num">Google & Meta</div>
+      <div class="cover-stat-label">Production Framework Standard</div>
+    </div>
+  </div>
+
+  <div class="card card-intuition" style="margin-top: auto;">
+    <div class="card-intuition-title">📘 How to Read and Apply This Blueprint</div>
+    <p>
+      • <strong>Executive / CFO:</strong> Focus on Chapter 1 (The Attribution Trap), Chapter 4 (Diminishing Returns), and Chapter 7 (Budget Optimization).<br>
+      • <strong>Data Science & Analytics:</strong> Review Chapter 2 (Master Equation), Chapter 3 (Adstock), Chapter 5 (Controls), and Chapter 6 (NNLS & Bayesian Priors).<br>
+      • <strong>Code Implementation:</strong> A production Python engine is saved alongside this document in <code>D:\MediaMixModel\mmm_engine.py</code>.
+    </p>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     PAGE 2: THE ATTRIBUTION CRISIS & SOCCER ANALOGY
+     ========================================================================== -->
+<div class="chapter-page">
+  <h1>1. The Attribution Crisis & The Soccer Team Analogy</h1>
+
+  <h2>The Fatal Flaw of Modern Digital Tracking</h2>
+  <p>
+    For the past decade, digital marketers relied on "Click Attribution." If a customer clicked a Google Search ad before buying a $200 jacket, Google claimed 100% of the credit. But ask yourself: <em>Did that search ad single-handedly convince the customer?</em> Or did they watch 3 TV commercials last month, see 5 TikTok reviews from influencers, and walk past a billboard downtown before finally searching for the brand name?
+  </p>
+
+  <div class="card card-intuition">
+    <div class="card-intuition-title">⚽ The 16-Year-Old Explanation: The Soccer Striker Trap</div>
+    <p>
+      Imagine a soccer match. The defender steals the ball, passes it to the midfielder, who dribbles past three opponents and serves an inch-perfect cross right in front of the net. The striker simply taps the ball in.
+    </p>
+    <p>
+      If your scoreboard software only recorded <strong>"who touched the ball last"</strong>, it would say: <em>"The striker did 100% of the work! Fire the defenders and midfielders!"</em> If a foolish coach did that, the team would lose 10-0.
+    </p>
+    <p>
+      <strong>Last-Click Attribution is that foolish manager.</strong> It fires TV and brand advertising because Google Search tapped the ball in. <strong>Media Mix Modeling (MMM) is the master coach</strong> who watches hundreds of games to calculate how much defense, midfield, and offense each contributed to winning.
+    </p>
+  </div>
+
+  <div class="figure-container">
+    <img src="images/figure1_attribution_decomposition.png" alt="Figure 1: Attribution Trap vs True MMM Decomposition">
+    <div class="figure-caption">Figure 1: The Last-Click Fallacy (Left) vs. True Econometric Decomposition via MMM (Right).</div>
+  </div>
+
+  <div class="card card-business" style="margin-top: auto;">
+    <div class="card-business-title">💼 Business Bottom Line: Why CFOs Demand MMM</div>
+    <p>
+      Platform dashboards (Facebook Ads Manager, Google Ads) routinely suffer from <strong>"Attribution Inflation"</strong>. If you add up the sales claimed by Google, Facebook, and TikTok dashboards, they often sum to 200% to 300% of the company's real bank deposits! MMM solves this because it calibrates against total actual top-line revenue—it is physically impossible for MMM to credit more dollars than the company actually earned.
+    </p>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     PAGE 3: THE MASTER ECONOMETRIC MMM EQUATION
+     ========================================================================== -->
+<div class="chapter-page">
+  <h1>2. The Master Econometric Equation</h1>
+
+  <p>
+    At its scientific core, a Media Mix Model is an econometric decomposition. It states that total sales on any given day or week is the sum of organic brand strength, trend, seasonal waves, non-linear advertising effects, and economic controls.
+  </p>
+
+  <div class="formula-box">
+    <div class="formula-label">The Grand Unified MMM Formulation</div>
+    <div class="formula-display">
+      <span class="hl-sales">Sales(t)</span> = 
+      <span class="hl-base">Baseline(t)</span> + 
+      <span class="hl-media">∑ β<sub>m</sub> · Saturation(Adstock(Spend<sub>m</sub>(t)))</span> + 
+      <span class="hl-control">∑ γ<sub>k</sub> · Control<sub>k</sub>(t)</span> + 
+      <span class="hl-noise">Noise(t)</span>
+    </div>
+    <div class="formula-subtitle">Mathematical foundation utilized by Google Meridian, Meta Robyn, and PyMC-Marketing</div>
+  </div>
+
+  <h2>Symbol-by-Symbol Mathematical Translation Table</h2>
+  <table class="decoder-table">
+    <thead>
+      <tr>
+        <th style="width: 15%;">Formula Term</th>
+        <th style="width: 25%;">Formal Math Definition</th>
+        <th style="width: 35%;">Plain-English Meaning</th>
+        <th style="width: 25%;">Real-World Example</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="symbol-tag">Sales(t)</span></td>
+        <td>Dependent Target Variable (Y)</td>
+        <td>The total KPI you care about at week t.</td>
+        <td>Weekly Revenue ($150,000) or Units Sold.</td>
+      </tr>
+      <tr>
+        <td><span class="symbol-tag">Baseline(t)</span></td>
+        <td>Unobserved Organic Intercept</td>
+        <td>Sales that would occur even with $0 advertising.</td>
+        <td>Brand loyalty, word of mouth, repeat subscribers.</td>
+      </tr>
+      <tr>
+        <td><span class="symbol-tag">Spend<sub>m</sub>(t)</span></td>
+        <td>Raw Media Spend / Impressions (X)</td>
+        <td>Dollars or impressions deployed on channel m.</td>
+        <td>$25,000 spent on Meta Instagram Ads in Week 14.</td>
+      </tr>
+      <tr>
+        <td><span class="symbol-tag">Adstock(·)</span></td>
+        <td>Memory / Carryover Function</td>
+        <td>How advertising echoes into future weeks.</td>
+        <td>Seeing a billboard on Monday and buying on Friday.</td>
+      </tr>
+      <tr>
+        <td><span class="symbol-tag">Saturation(·)</span></td>
+        <td>Non-Linear Diminishing Returns</td>
+        <td>Mathematical curve proving more spend yields less lift.</td>
+        <td>The 10th pizza slice brings less joy than the 1st.</td>
+      </tr>
+      <tr>
+        <td><span class="symbol-tag">β<sub>m</sub></span></td>
+        <td>Positive Channel Impact Weight</td>
+        <td>Strictly non-negative scale factor (β<sub>m</sub> ≥ 0).</td>
+        <td>Direct conversion power of that channel.</td>
+      </tr>
+      <tr>
+        <td><span class="symbol-tag">Control<sub>k</sub>(t)</span></td>
+        <td>External Business Controls (Z)</td>
+        <td>Outside world events that impact sales.</td>
+        <td>Macro inflation, competitor sales, holidays, price.</td>
+      </tr>
+      <tr>
+        <td><span class="symbol-tag">Noise(t)</span></td>
+        <td>Unexplained Error (ε)</td>
+        <td>Unobserved random variation or shock.</td>
+        <td>A sudden local storm or random viral post.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="card card-intuition">
+    <div class="card-intuition-title">🏊 The 16-Year-Old Explanation: The Swimming Pool Water Level</div>
+    <p>
+      Think of your weekly sales like the water depth in a giant backyard swimming pool:
+      <strong>Baseline</strong> is the natural water already in the pool that stays there even if no one turns on a hose. 
+      <strong>Seasonality</strong> is natural summer rain that raises the level on its own. 
+      <strong>Media Channels</strong> are three garden hoses (TV, Social, Search) pumping extra water into the pool. 
+      <strong>Controls</strong> represent hot sunny evaporation (competitors running 50% discounts).
+      MMM measures the water level each week and calculates exactly how many gallons came from the rain versus each garden hose.
+    </p>
+  </div>
+
+  <div class="card card-business" style="margin-top: auto;">
+    <div class="card-business-title">📊 The 4 Diagnostic Pillars: How to Know If Your Model is Trustworthy</div>
+    <p>
+      1. <strong>Out-of-Sample MAPE &lt; 10%:</strong> The model predicts future holdout weeks within 10% error.<br>
+      2. <strong>Variance Explained (R² &gt; 0.85):</strong> The model accounts for at least 85% of total sales movement.<br>
+      3. <strong>Plausibility Check:</strong> All media coefficients are strictly non-negative (β<sub>m</sub> ≥ 0).<br>
+      4. <strong>Residual White Noise:</strong> Model residuals pass the Durbin-Watson test (no hidden autocorrelation).
+    </p>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     PAGE 4: ADSTOCK & CARRYOVER EFFECTS
+     ========================================================================== -->
+<div class="chapter-page">
+  <h1>3. Adstock: The "Memory" of Advertising</h1>
+
+  <p>
+    Advertising does not disappear the moment an ad finishes airing. If an ad runs on Sunday evening, a customer might recall it while shopping on Wednesday. This lingering carryover effect is termed <strong>Adstock</strong>.
+  </p>
+
+  <div class="formula-box">
+    <div class="formula-label">Formula A: Classic Geometric Adstock (Recursive)</div>
+    <div class="formula-display">
+      <span class="hl-sales">Adstock(t)</span> = 
+      <span class="hl-media">Spend(t)</span> + 
+      <span class="hl-base">α · Adstock(t - 1)</span>
+    </div>
+    <div class="formula-subtitle">Parameter: α ∈ [0, 1) represents the memory retention rate per time period</div>
+  </div>
+
+  <h2>Parameter & Formula Decoder Table</h2>
+  <table class="decoder-table">
+    <thead>
+      <tr>
+        <th style="width: 18%;">Symbol / Metric</th>
+        <th style="width: 27%;">Formal Math Formula</th>
+        <th style="width: 32%;">Plain-English Meaning</th>
+        <th style="width: 23%;">Typical Benchmarks</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="symbol-tag">α (Alpha)</span></td>
+        <td>Retention Decay Rate</td>
+        <td>Percentage of marketing pressure that survives into next week.</td>
+        <td>Search: 0.10 - 0.20<br>Social: 0.30 - 0.50<br>TV/Video: 0.60 - 0.85</td>
+      </tr>
+      <tr>
+        <td><span class="symbol-tag">Half-Life</span></td>
+        <td>T<sub>½</sub> = ln(0.5) / ln(α)</td>
+        <td>Number of weeks until 50% of the ad's impact has evaporated.</td>
+        <td>If α = 0.50, Half-Life = 1.0 wk<br>If α = 0.80, Half-Life = 3.1 wks</td>
+      </tr>
+      <tr>
+        <td><span class="symbol-tag">L_max</span></td>
+        <td>Finite Memory Window</td>
+        <td>Maximum lookback periods tracked in memory.</td>
+        <td>Usually 4 to 12 weeks.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="figure-container">
+    <img src="images/figure2_adstock_carryover.png" alt="Figure 2: Adstock Decay & Build-Up">
+    <div class="figure-caption">Figure 2: Single Impulse Decay by Channel (Left) vs. Cumulative Marketing Pressure Build-Up (Right).</div>
+  </div>
+
+  <div class="card card-intuition">
+    <div class="card-intuition-title">🎵 The 16-Year-Old Explanation: The "Earworm" Song on TikTok</div>
+    <p>
+      When a catchy song pops up on TikTok: on Monday it's 100% in your head; on Tuesday you hum the chorus (80%); by Thursday you remember the beat (40%); by next Sunday you barely recall it. Search ads are like someone shouting a discount code (forgotten in 1 day, α = 0.10). TV ads are earworm songs that echo for 6 weeks (α = 0.75).
+    </p>
+  </div>
+
+  <div class="card card-business" style="margin-top: auto;">
+    <div class="card-business-title">💼 Business Bottom Line: Flighting vs. Continuous Drip</div>
+    <p>
+      If your brand's adstock is high (α &gt; 0.70), you do not need to spend money every single week. You can use <strong>"Pulsing / Flighting"</strong> (spend heavy for 2 weeks, pause for 2 weeks). Your sales will ride the adstock wave, saving 20% to 30% of your annual media budget!
+    </p>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     PAGE 5: DIMINISHING RETURNS & HILL SATURATION
+     ========================================================================== -->
+<div class="chapter-page">
+  <h1>4. Diminishing Returns & The Hill Saturation Function</h1>
+
+  <p>
+    The most dangerous assumption in marketing is that ad response is linear. Spending $100,000 does <em>never</em> produce 10 times the sales of $10,000. Why? Because you saturate the market, spam the same users, and exhaust high-intent buyers.
+  </p>
+
+  <div class="formula-box">
+    <div class="formula-label">The Pharmacology-Inspired Hill Saturation Equation</div>
+    <div class="formula-display" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+      <span class="hl-sales">Response(A)</span>
+      <span style="color: #94A3B8;">=</span>
+      <div class="math-fraction">
+        <span class="math-numerator">A<sup>S</sup></span>
+        <span class="math-denominator">A<sup>S</sup> + K<sup>S</sup></span>
+      </div>
+    </div>
+    <div class="formula-subtitle">Transforms adstocked spend A into a normalized 0.0 to 1.0 saturation coefficient</div>
+  </div>
+
+  <h2>Parameter & Formula Decoder Table</h2>
+  <table class="decoder-table">
+    <thead>
+      <tr>
+        <th style="width: 15%;">Symbol</th>
+        <th style="width: 25%;">Formal Math Term</th>
+        <th style="width: 35%;">Plain-English Meaning</th>
+        <th style="width: 25%;">Decision Rule</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="symbol-tag">A</span></td>
+        <td>Adstocked Media Pressure</td>
+        <td>The effective marketing volume active in the market at week t.</td>
+        <td>Input to the curve.</td>
+      </tr>
+      <tr>
+        <td><span class="symbol-tag">K</span></td>
+        <td>Half-Saturation Constant</td>
+        <td>The spend level where the channel reaches 50% of its maximum power.</td>
+        <td>If spend is much less than K: under-spending.<br>If spend is much greater than K: saturating.</td>
+      </tr>
+      <tr>
+        <td><span class="symbol-tag">S</span></td>
+        <td>Hill Curvature Slope</td>
+        <td>Controls the steepness and shape of the saturation curve.</td>
+        <td>S ≤ 1.0: Immediate concave decay.<br>S &gt; 1.0: S-Curve (requires priming).</td>
+      </tr>
+      <tr>
+        <td><span class="symbol-tag">mROAS</span></td>
+        <td>Marginal ROAS: ΔRevenue / ΔSpend</td>
+        <td>How much additional revenue the <strong>next single dollar</strong> will produce.</td>
+        <td>Must remain &gt; 1.0 (otherwise losing money).</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="figure-container">
+    <img src="images/figure3_hill_saturation.png" alt="Figure 3: Hill Saturation Curve & Marginal ROAS Collapse">
+    <div class="figure-caption">Figure 3: Total Response S-Curve (Left) vs. Marginal ROAS Collapse (Right).</div>
+  </div>
+
+  <div class="card card-intuition">
+    <div class="card-intuition-title">🍕 The 16-Year-Old Explanation: Eating Pizza Slices</div>
+    <p>
+      Slice 1 when you're starving: 10/10 amazing ($1 spent makes $5 sales). Slice 2 & 3: Great ($1 makes $3.50). Slice 5: You are full ($1 makes $1.10). Slice 8: You feel sick ($1 makes $0.20). Many marketing teams are force-feeding themselves Slice #8 every day and wondering why profits are plummeting.
+    </p>
+  </div>
+
+  <div class="card card-warning" style="margin-top: auto;">
+    <div class="card-warning-title">⚠️ The Blended ROAS Trap (Why Marketers Get Fired)</div>
+    <p>
+      An agency boasts: <em>"Our Meta Ads have an average ROAS of 3.0x! Let's double the budget!"</em> They double spend from $50k to $100k, but sales barely move. Why? The <strong>average</strong> was 3.0x, but the <strong>marginal ROAS</strong> on the next $50k was only 0.40x. Every single extra dollar spent lost 60 cents! MMM exposes this curve instantly.
+    </p>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     PAGE 6: EXTERNAL CONTROLS & BASELINE DECOMPOSITION
+     ========================================================================== -->
+<div class="chapter-page">
+  <h1>5. Baselining, Seasonality & External Economic Controls</h1>
+
+  <p>
+    To calculate true advertising effectiveness, you must first strip away everything that is <strong>NOT</strong> caused by advertising. If sales spike in December, is your marketing team a bunch of geniuses, or is it just Christmas?
+  </p>
+
+  <div class="formula-box">
+    <div class="formula-label">Baseline & External Shocks Formulation</div>
+    <div class="formula-display">
+      <span class="hl-base">Base(t)</span> = 
+      <span class="hl-base">β₀ + Trend · t</span> + 
+      <span class="hl-control">∑ [s₁ · sin(2πt/52) + s₂ · cos(2πt/52)]</span> + 
+      <span class="hl-control">γ₁ · Price(t) + γ₂ · CompetitorPromo(t)</span>
+    </div>
+    <div class="formula-subtitle">Decomposes time series into underlying linear trend, annual Fourier seasonality, and economic controls</div>
+  </div>
+
+  <h2>Why Control Variables Are Non-Negotiable</h2>
+  <table class="decoder-table">
+    <thead>
+      <tr>
+        <th style="width: 20%;">Variable Category</th>
+        <th style="width: 30%;">Mathematical Implementation</th>
+        <th style="width: 50%;">Real-World Business Impact</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Organic Baseline</strong></td>
+        <td>Unchanging intercept β₀ or time-varying spline.</td>
+        <td>Sales driven by brand equity, physical store presence, and existing customer base.</td>
+      </tr>
+      <tr>
+        <td><strong>Annual Seasonality</strong></td>
+        <td>Fourier harmonics: sin(2πt/52), cos(2πt/52).</td>
+        <td>Smoothly captures recurring holiday spikes (Q4 shopping, summer dips) without overfitting.</td>
+      </tr>
+      <tr>
+        <td><strong>Pricing & Discounts</strong></td>
+        <td>Continuous price index variable.</td>
+        <td>Isolates whether sales increased because of a great ad campaign or because you slashed prices by 30%.</td>
+      </tr>
+      <tr>
+        <td><strong>Competitor Activity</strong></td>
+        <td>Binary dummy or competitor spend index.</td>
+        <td>Explains random drops in your sales when your rival launches a massive Super Bowl campaign.</td>
+      </tr>
+      <tr>
+        <td><strong>Macroeconomics</strong></td>
+        <td>Consumer Price Index (CPI), Unemployment rate.</td>
+        <td>Accounts for broader consumer spending power drops during recessions.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="card card-intuition">
+    <div class="card-intuition-title">🍦 The 16-Year-Old Explanation: Selling Ice Cream on the Boardwalk</div>
+    <p>
+      Imagine you sell ice cream on the beach:
+    </p>
+    <ul>
+      <li>In <strong>July</strong> (sunny, 90°F), you sell 1,000 ice creams a day even if you do zero advertising.</li>
+      <li>In <strong>January</strong> (freezing snowstorm), you sell 10 ice creams a day even if you spend $10,000 on ads.</li>
+    </ul>
+    <p>
+      If your model doesn't account for temperature (Seasonality/Control), it will falsely conclude that your ads are pure magic in July and completely useless in January! MMM removes the "weather effect" so you see the true causal impact of your ad dollars.
+    </p>
+  </div>
+
+  <div class="card card-business" style="margin-top: auto;">
+    <div class="card-business-title">💼 Preventing Agency Misattribution</div>
+    <p>
+      Unscrupulous agencies often ramp up spend during peak holiday seasons and take credit for the natural organic surge. By modeling Fourier seasonality explicitly, MMM isolates the true incremental lift beyond the seasonal wave, protecting your budget from false claims.
+    </p>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     PAGE 7: STATISTICAL CHALLENGES & CALIBRATION
+     ========================================================================== -->
+<div class="chapter-page">
+  <h1>6. Statistical Pitfalls: Non-Negative Constraints & Calibration</h1>
+
+  <h2>The Two Cardinal Sins of Novice MMM</h2>
+  <p>
+    When inexperienced analysts run simple regressions (like Ordinary Least Squares in Excel or basic statsmodels), they almost always run into two fatal traps:
+  </p>
+
+  <div class="card card-warning">
+    <div class="card-warning-title">🚨 Trap 1: The "Negative Coefficient" Absurdity</div>
+    <p>
+      <strong>The Problem:</strong> A raw regression outputs β<sub>TV</sub> = -1.45. The math claims that airing TV ads causes customers to hate you and stop buying!<br>
+      <strong>The Cause:</strong> Multicollinearity. Brands spend heavily on TV, Social, and Search in the exact same weeks (e.g., Black Friday). The algorithm cannot tell which one drove the sales, so it gives one channel a huge positive number and artificially penalizes another with a negative number.<br>
+      <strong>The Solution: Non-Negative Least Squares (NNLS)</strong>. We enforce strict mathematical boundary conditions: β<sub>m</sub> ≥ 0. Advertising can have diminishing returns, but it cannot destroy baseline revenue.
+    </p>
+  </div>
+
+  <h2>Modern Calibration: Triangulating with Experiments (Google Meridian / Meta Robyn)</h2>
+  <p>
+    Pure observational modeling only sees <em>correlation</em>. To prove <em>causation</em>, the gold standard in modern data science is <strong>Triangulation</strong>: combining observational MMM with <strong>Randomized Controlled Experiments (Geo-Lift Tests)</strong>.
+  </p>
+
+  <div class="figure-container">
+    <img src="images/figure5_enterprise_architecture.png" alt="Figure 5: Enterprise MMM Architecture">
+    <div class="figure-caption">Figure 5: End-to-End Enterprise Architecture: Ingestion, Transformation, Bayesian Prior Calibration, and Optimization.</div>
+  </div>
+
+  <table class="decoder-table" style="margin-top: auto;">
+    <thead>
+      <tr>
+        <th style="width: 25%;">Calibration Method</th>
+        <th style="width: 35%;">How It Works</th>
+        <th style="width: 40%;">How MMM Uses It</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Geo-Lift Test (RCT)</strong></td>
+        <td>Turn off ads in 10 test states (e.g., Ohio, Texas) while keeping them running in 10 matched control states.</td>
+        <td>Measures true causal dollar lift with 95% statistical confidence.</td>
+      </tr>
+      <tr>
+        <td><strong>Bayesian Prior Injection</strong></td>
+        <td>Inform the MMM using Gaussian distributions centered around the experimental lift result: β<sub>m</sub> ~ Normal(Lift<sub>exp</sub>, Variance).</td>
+        <td>Prevents the model from hallucinating unreasonable ROAS numbers that contradict real-world experiments.</td>
+      </tr>
+      <tr>
+        <td><strong>Ghost-Ad Holdouts</strong></td>
+        <td>Digital platforms withhold ads from a randomized 5% control group of users.</td>
+        <td>Validates digital search/social incrementality directly against organic behavior.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ==========================================================================
+     PAGE 8: BUDGET OPTIMIZATION & SCENARIO PLANNING
+     ========================================================================== -->
+<div class="chapter-page">
+  <h1>7. Mathematical Budget Optimization</h1>
+
+  <p>
+    Fitting an MMM is only half the battle. The true business value comes when you use the learned parameters to answer: <strong>"How should we allocate our $100,000 budget next month to maximize total revenue?"</strong>
+  </p>
+
+  <div class="formula-box">
+    <div class="formula-label">Non-Linear Constrained Optimization Problem</div>
+    <div class="formula-display">
+      max [ ∑ β<sub>m</sub> · Saturation(B<sub>m</sub>) ] &nbsp;&nbsp; subject to &nbsp;&nbsp; ∑ B<sub>m</sub> = Total_Budget
+    </div>
+    <div class="formula-subtitle">Solved via Sequential Least Squares Programming (SLSQP) with Karush-Kuhn-Tucker (KKT) optimality</div>
+  </div>
+
+  <h2>The Equi-Marginal Principle</h2>
+  <p>
+    In economic theory, your budget is optimally allocated when the <strong>Marginal ROAS is identical across all active channels</strong>:
+  </p>
+  <div style="text-align: center; font-size: 10.5pt; font-weight: 700; color: #1E3A8A; margin: 4px 0;">
+    mROAS<sub>TV</sub> = mROAS<sub>Social</sub> = mROAS<sub>Search</sub> = λ
+  </div>
+  <p>
+    If TV is giving you a marginal return of $3.50 on the next dollar, while Social is only giving you $1.20, every single dollar you move from Social to TV generates $2.30 of pure free profit! You keep shifting money until their marginal returns equalize.
+  </p>
+
+  <div class="figure-container">
+    <img src="images/figure4_budget_optimization.png" alt="Figure 4: Budget Optimization Results">
+    <div class="figure-caption">Figure 4: Before vs. After Budget Re-allocation (Left) and Resulting Incremental Revenue Lift (Right).</div>
+  </div>
+
+  <div class="card card-business">
+    <div class="card-business-title">💰 Case Study Result: +$42,000 Free Revenue</div>
+    <p>
+      In the simulation shown above, the company spent <strong>$100,000</strong> per month:
+      <strong>Old Allocation:</strong> Heavy over-spending on TV ($45k) pushed it deep into the flat saturation zone. Search was under-funded ($20k). Total revenue generated: <strong>$184,000</strong>.
+      <strong>MMM Optimal Allocation:</strong> Shifted $20k out of saturated TV and re-allocated it into high-performing Search. Total revenue generated: <strong>$226,000</strong>.
+      <strong>Net Business Impact:</strong> <strong>+$42,000 in incremental revenue (+22.8% lift)</strong> without increasing the media budget by a single penny!
+    </p>
+  </div>
+
+  <div class="card card-intuition" style="margin-top: auto;">
+    <div class="card-intuition-title">🎯 The 4 Operational Rules for Real-World Budget Shifts</div>
+    <p>
+      1. <strong>The 30% Volatility Cap:</strong> Never shift more than 30% of a channel's budget in a single quarter.<br>
+      2. <strong>Auction Inflation:</strong> Pumping money too fast into digital auctions drives up your own CPMs.<br>
+      3. <strong>Brand-to-Search Multiplier:</strong> Remember that cutting TV also reduces Brand Search search volume.<br>
+      4. <strong>Quarterly Recalibration:</strong> Retrain your MMM every 4–6 weeks as saturation parameters drift.
+    </p>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     PAGE 9: EXECUTIVE CHECKLIST & IMPLEMENTATION ROADMAP
+     ========================================================================== -->
+<div class="chapter-page last-page">
+  <h1>8. Executive Checklist & Implementation Roadmap</h1>
+
+  <h2>Step-by-Step Production Roadmap</h2>
+  <table class="decoder-table">
+    <thead>
+      <tr>
+        <th style="width: 15%;">Phase</th>
+        <th style="width: 30%;">Key Milestones</th>
+        <th style="width: 55%;">Verification & Quality Gate</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Phase 1: Data Audit</strong></td>
+        <td>Collect 2–3 years of weekly data across spend, impressions, baseline sales, pricing, and macro events.</td>
+        <td>Check for data gaps, missing weeks, or currency mismatches. Ensure at least 104 weekly observations.</td>
+      </tr>
+      <tr>
+        <td><strong>Phase 2: Feature Engineering</strong></td>
+        <td>Compute Geometric/Weibull adstock curves and Fourier seasonality sin/cos terms.</td>
+        <td>Ensure adstock search parameters span direct response (α ≈ 0.1) to TV (α ≈ 0.8).</td>
+      </tr>
+      <tr>
+        <td><strong>Phase 3: Model Fitting</strong></td>
+        <td>Execute non-linear optimization with Non-Negative Least Squares (NNLS) for media coefficients.</td>
+        <td>Confirm all β<sub>m</sub> ≥ 0. Ensure holdout test Mean Absolute Percentage Error (MAPE) is below 10%.</td>
+      </tr>
+      <tr>
+        <td><strong>Phase 4: Calibration</strong></td>
+        <td>Calibrate model predictions against at least one real-world Geo-Lift or Holdout test.</td>
+        <td>Verify that model-estimated channel ROAS falls within the 95% confidence interval of the lift test.</td>
+      </tr>
+      <tr>
+        <td><strong>Phase 5: Optimization</strong></td>
+        <td>Run SLSQP optimizer to produce the next quarter's recommended spend distribution.</td>
+        <td>Add min/max guardrails (e.g., no channel can change by more than ±30% in one quarter).</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>The 10-Point Pre-Flight Verification Checklist</h2>
+  <div class="card card-intuition">
+    <div class="card-intuition-title">✅ The MMM Auditor's Checklist</div>
+    <ul style="margin: 0; padding-left: 18px; font-size: 8pt; line-height: 1.4;">
+      <li><strong>1. No Cookies Used:</strong> Is the model 100% compliant with privacy regulations (GDPR/CCPA/ATT)?</li>
+      <li><strong>2. Non-Negative Constraints:</strong> Are all media betas strictly non-negative (β<sub>m</sub> ≥ 0)?</li>
+      <li><strong>3. Diminishing Returns Included:</strong> Does every channel use a non-linear saturation curve (Hill/Sigmoid)?</li>
+      <li><strong>4. Organic Baseline Separated:</strong> Did the model calculate baseline sales without ads?</li>
+      <li><strong>5. Seasonality Controlled:</strong> Are holidays and annual cycles modeled explicitly?</li>
+      <li><strong>6. External Controls Included:</strong> Were pricing changes and promotions included in the covariates?</li>
+      <li><strong>7. Holdout Validation:</strong> Was the model tested on out-of-sample data not used during training?</li>
+      <li><strong>8. Marginal ROAS vs. Average ROAS:</strong> Did decisions rely on marginal curves rather than blended averages?</li>
+      <li><strong>9. Spend Guardrails in Optimizer:</strong> Did the optimizer enforce realistic operational minimums and maximums?</li>
+      <li><strong>10. Code Execution:</strong> Can the accompanying <code>mmm_engine.py</code> run end-to-end without errors?</li>
+    </ul>
+  </div>
+
+  <div style="margin-top: auto; text-align: center; border-top: 1px solid #CBD5E1; padding-top: 8px; font-size: 7.5pt; color: #64748B;">
+    <strong>Document Reference:</strong> Local Disk D: • <code>D:\MediaMixModel\The_Definitive_Guide_to_Media_Mix_Modeling.pdf</code><br>
+    Companion Production Script: <code>D:\MediaMixModel\mmm_engine.py</code> • Generated for Executive Presentation & High-Quality Print
+  </div>
+</div>
+
+</body>
+</html>
+"""
+
+with open(html_path, "w", encoding="utf-8") as f:
+    f.write(html_content)
+
+print(f"Guide written to {html_path}")
+
+chrome_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+cmd = [
+    chrome_path,
+    "--headless=new",
+    "--disable-gpu",
+    "--run-all-compositor-stages-before-draw",
+    f"--print-to-pdf={pdf_path}",
+    "--no-pdf-header-footer",
+    html_path
+]
+
+print("Compiling PDF with Chrome Headless...")
+result = subprocess.run(cmd, capture_output=True, text=True)
+
+doc = pymupdf.open(pdf_path)
+print(f"Total Pages in PDF: {len(doc)}")
+
+for i, page in enumerate(doc):
+    pix = page.get_pixmap(dpi=150)
+    img_out = os.path.join(pages_dir, f"page_{i+1}.png")
+    pix.save(img_out)
+    text = page.get_text()
+    first_line = text.strip().split('\n')[0] if text.strip() else '[EMPTY]'
+    print(f"  Page {i+1}: {len(text)} chars | Header: {first_line[:40]}")
+
+print("All pages rendered and saved for quality inspection.")
