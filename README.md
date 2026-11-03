@@ -1,48 +1,42 @@
-# Media Mix Modeling (MMM) Engine & Executive Blueprint
+# MediaMixModel — Independent Econometric Intelligence Platform
 
-A production-grade, privacy-safe **Marketing Mix Modeling (MMM)** suite combining state-of-the-art econometric architectures (inspired by Google Meridian, Meta Robyn, and PyMC-Marketing) with an executive visual blueprint.
-
----
-
-## 📑 Contents
-
-1. **`The_Definitive_Guide_to_Media_Mix_Modeling.pdf`**  
-   A 9-page, print-ready executive manual designed for CMOs, CFOs, and Analytics Leads. Covers every concept from first principles with real-world analogies, clean formulas, parameter decoder tables, and 300-DPI visual exhibits.
-2. **`mmm_engine.py`**  
-   The standalone, production-ready Python model with Geometric Adstock, Hill Saturation, Non-Negative Least Squares (NNLS) constraints, holdout testing (MAPE), and SLSQP non-linear budget optimization.
-3. **`generate_charts.py`**  
-   Script generating all 5 high-resolution (300 DPI) publication-grade diagrams in `images/`.
+Industry-grade Media Mix Modeling (MMM) that operates outside walled gardens and data silos to measure true causal incrementality and optimize cross-channel budget allocation.
 
 ---
 
-## 🚀 Quickstart
-
-### 1. Run the Python Model
-```bash
-python mmm_engine.py
-```
-
-### 2. Output Highlights
-- **Out-of-sample MAPE**: ~4.5% (95.5% model accuracy on holdout weeks)
-- **Channel Attribution**: Decomposed revenue across organic baseline, seasonality, and incremental media channels (TV, Social, Search).
-- **SLSQP Budget Allocator**: Automatically re-balances any target monthly budget to maximize incremental media return without crossing saturation limits.
+## 🌪️ The Measurement Dilemma
+Modern digital marketing attribution is fundamentally broken:
+1. **The Walled Garden Attribution Trap**: Ad networks measure performance in closed silos, claiming credit for identical conversions. Summed dashboard revenues frequently exceed 200–300% of actual top-line revenue.
+2. **Signal Deprecation & Cookie Blindness**: Global privacy shifts (GDPR, CCPA) and mobile tracking prevention (ATT) have broken deterministic click-tracking across devices.
+3. **Blind Over-Saturation**: Spending blindly without understanding the half-saturation threshold burns capital on flat marginal return curves.
+4. **Last-Click Short-Termism**: Rewarding only the final touchpoint starves upper-funnel and brand-building channels, causing long-term baseline customer decay.
 
 ---
 
-## 🔬 Mathematical Formulations
-
-### 1. The Grand MMM Formulation
-$$\text{Sales}(t) = \text{Baseline}(t) + \sum_{m} \beta_m \cdot \text{Saturation}(\text{Adstock}(\text{Spend}_m(t))) + \sum_{k} \gamma_k \cdot \text{Control}_k(t) + \epsilon(t)$$
-
-### 2. Geometric Adstock Decay
-$$\text{Adstock}(t) = \text{Spend}(t) + \alpha \cdot \text{Adstock}(t - 1)$$
-
-### 3. Hill Saturation Function
-$$\text{Response}(A) = \frac{A^S}{A^S + K^S}$$
-- $K$: Half-saturation constant (spend amount that reaches 50% power)
-- $S$: Hill curvature slope (concave vs S-curve)
+## 💡 Introducing Media Mix Modeling
+Media Mix Modeling (MMM) operates independently from user-level tracking by analyzing aggregated time-series econometrics:
+- **Organic Baseline Demand**: Separates natural brand momentum from paid media lift.
+- **Adstock Carryover & Memory**: Models lingering brand impression retention over time (Geometric & Weibull formulations).
+- **Hill Saturation & Diminishing Returns**: Identifies the non-linear inflection point where marginal return drops.
+- **Exogenous Macro Controls**: Accounts for pricing changes, competitor promotions, and seasonality.
 
 ---
 
-## 🛡️ License & Confidentiality
-Confidential and proprietary media mix modeling blueprint.
+## 📈 Strategic Business Use Cases
+- **Cross-Channel Capital Re-balancing**: Shifting spend from saturated channels to high-marginal-return opportunities to unlock 15–25% higher revenue at flat overall expenditure.
+- **Offline & Upper-Funnel Quantification**: Measuring the true causal lift of non-clickable mediums (TV, streaming, sponsorship, DOOH, audio).
+- **Diminishing Return & Marginal Breakeven Audits**: Preventing unprofitable scale by capping channels before marginal ROAS dips below $1.00.
+- **Experimental Triangulation**: Calibrating observational models against randomized geo-lift tests.
+
+---
+
+## 🌐 Interactive Web Experience
+Launch the live interactive web simulator:
+- **Live Deployment**: [https://parth1132.github.io/MediaMixModel/](https://parth1132.github.io/MediaMixModel/)
+- **Local File**: `index.html` (or `docs/index.html`)
+
+---
+
+## 👤 Author
+Created by **Partha Mishra**  
+LinkedIn: [linkedin.com/in/parthamishra](https://www.linkedin.com/in/parthamishra)
