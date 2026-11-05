@@ -1,5 +1,14 @@
 # MediaMixModel — Independent Econometric Intelligence Platform
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Python](https://img.shields.io/badge/Python-3.15-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![React](https://img.shields.io/badge/React-19.3-61DAFB?logo=react&logoColor=black)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-8.x-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![CI Pipeline](https://github.com/Parth1132/MediaMixModel/actions/workflows/ci.yml/badge.svg)](https://github.com/Parth1132/MediaMixModel/actions)
+[![Live Simulator](https://img.shields.io/badge/Live_Simulator-GitHub_Pages-10B981?logo=github-pages&logoColor=white)](https://parth1132.github.io/MediaMixModel/)
+
 Industry-grade Media Mix Modeling (MMM) that operates outside walled gardens and data silos to measure true causal incrementality, model adstock memory decay, and optimize cross-channel budget allocation via non-linear programming.
 
 ---

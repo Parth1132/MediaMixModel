@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   UploadCloud,
   FileSpreadsheet,
@@ -7,7 +7,8 @@ import {
   ArrowRight,
   RefreshCw,
   Layers,
-  AlertCircle
+  AlertCircle,
+  Move
 } from 'lucide-react';
 import {
   MetaIcon,
@@ -28,48 +29,289 @@ interface NexusProps {
   onDatasetLoaded: (dataset: HarmonizedDataset) => void;
 }
 
-interface PlatformNode {
+interface PlatformPhysicsNode {
   id: string;
   name: string;
   category: 'ad' | 'revenue';
   color: string;
   icon: React.ReactNode;
   hint: string;
-  // Dispersed coordinates (relative %)
-  floatX: number;
-  floatY: number;
-  // Converged coordinates (orbital radius %)
-  convergeAngle: number;
+  angleDeg: number;
+  // Physics state
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius: number;
+  mass: number;
+  isDragging: boolean;
+  dragOffsetX: number;
+  dragOffsetY: number;
+  lastMouseX: number;
+  lastMouseY: number;
 }
 
 export const DataConvergenceNexus: React.FC<NexusProps> = ({ onDatasetLoaded }) => {
-  const [converged, setConverged] = useState<boolean>(false);
-  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [converged, setConverged] = useState<boolean>(true);
+  const [isDraggingFile, setIsDraggingFile] = useState<boolean>(false);
   const [uploadedFiles, setUploadedFiles] = useState<ParseResult[]>([]);
   const [dataset, setDataset] = useState<HarmonizedDataset | null>(null);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const arenaRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const animFrameRef = useRef<number | null>(null);
 
-  const platforms: PlatformNode[] = [
-    { id: 'meta', name: 'Meta Ads', category: 'ad', color: '#0082FB', icon: <MetaIcon size={28} />, hint: 'Export with Amount Spent, Reporting Starts', floatX: 12, floatY: 15, convergeAngle: 0 },
-    { id: 'google', name: 'Google Ads', category: 'ad', color: '#4285F4', icon: <GoogleAdsIcon size={28} />, hint: 'Export with Cost, Day / Date, Impr.', floatX: 84, floatY: 16, convergeAngle: 36 },
-    { id: 'tiktok', name: 'TikTok Ads', category: 'ad', color: '#FE2C55', icon: <TikTokIcon size={28} />, hint: 'Export with Total Cost, Stat Date', floatX: 6, floatY: 52, convergeAngle: 72 },
-    { id: 'amazon', name: 'Amazon Ads', category: 'ad', color: '#FF9900', icon: <AmazonIcon size={28} />, hint: 'Export with Spend, Date, Impressions', floatX: 90, floatY: 50, convergeAngle: 108 },
-    { id: 'shopify', name: 'Shopify Store', category: 'revenue', color: '#96BF48', icon: <ShopifyIcon size={28} />, hint: 'Target: Net Sales / Total Sales by Day', floatX: 18, floatY: 82, convergeAngle: 144 },
-    { id: 'stripe', name: 'Stripe Payments', category: 'revenue', color: '#635BFF', icon: <StripeIcon size={28} />, hint: 'Target: Daily gross revenue / balance', floatX: 82, floatY: 84, convergeAngle: 180 },
-    { id: 'youtube', name: 'YouTube Ads', category: 'ad', color: '#FF0000', icon: <YouTubeIcon size={28} />, hint: 'Export with Video Cost & Views', floatX: 48, floatY: 8, convergeAngle: 216 },
-    { id: 'linkedin', name: 'LinkedIn Ads', category: 'ad', color: '#0A66C2', icon: <LinkedInIcon size={28} />, hint: 'Export with Total Spent, Start Date', floatX: 30, floatY: 90, convergeAngle: 252 },
-    { id: 'apple', name: 'Apple Search', category: 'ad', color: '#0071E3', icon: <AppleIcon size={28} />, hint: 'Export with Spend & Search Terms', floatX: 70, floatY: 90, convergeAngle: 288 },
-    { id: 'pinterest', name: 'Pinterest Ads', category: 'ad', color: '#E60023', icon: <PinterestIcon size={28} />, hint: 'Export with Paid Spend & Pin Clicks', floatX: 50, floatY: 92, convergeAngle: 324 },
-  ];
+  // Initialize Physics Nodes
+  const nodesRef = useRef<PlatformPhysicsNode[]>([
+    { id: 'meta', name: 'Meta Ads', category: 'ad', color: '#0082FB', icon: <MetaIcon size={26} />, hint: 'Amount Spent, Reporting Starts', angleDeg: 0, x: 120, y: 100, vx: 0.5, vy: -0.3, radius: 28, mass: 1, isDragging: false, dragOffsetX: 0, dragOffsetY: 0, lastMouseX: 0, lastMouseY: 0 },
+    { id: 'google', name: 'Google Ads', category: 'ad', color: '#4285F4', icon: <GoogleAdsIcon size={26} />, hint: 'Cost, Day / Date, Impr.', angleDeg: 36, x: 750, y: 90, vx: -0.4, vy: 0.6, radius: 28, mass: 1, isDragging: false, dragOffsetX: 0, dragOffsetY: 0, lastMouseX: 0, lastMouseY: 0 },
+    { id: 'tiktok', name: 'TikTok Ads', category: 'ad', color: '#FE2C55', icon: <TikTokIcon size={26} />, hint: 'Total Cost, Stat Date', angleDeg: 72, x: 80, y: 320, vx: 0.8, vy: 0.2, radius: 28, mass: 1, isDragging: false, dragOffsetX: 0, dragOffsetY: 0, lastMouseX: 0, lastMouseY: 0 },
+    { id: 'amazon', name: 'Amazon Ads', category: 'ad', color: '#FF9900', icon: <AmazonIcon size={26} />, hint: 'Spend, Date, Impressions', angleDeg: 108, x: 820, y: 330, vx: -0.6, vy: -0.5, radius: 28, mass: 1, isDragging: false, dragOffsetX: 0, dragOffsetY: 0, lastMouseX: 0, lastMouseY: 0 },
+    { id: 'shopify', name: 'Shopify Store', category: 'revenue', color: '#96BF48', icon: <ShopifyIcon size={26} />, hint: 'Target: Net Sales / Orders', angleDeg: 144, x: 180, y: 460, vx: 0.3, vy: -0.7, radius: 28, mass: 1, isDragging: false, dragOffsetX: 0, dragOffsetY: 0, lastMouseX: 0, lastMouseY: 0 },
+    { id: 'stripe', name: 'Stripe Payments', category: 'revenue', color: '#635BFF', icon: <StripeIcon size={26} />, hint: 'Target: Daily Gross Sales', angleDeg: 180, x: 720, y: 470, vx: -0.5, vy: -0.4, radius: 28, mass: 1, isDragging: false, dragOffsetX: 0, dragOffsetY: 0, lastMouseX: 0, lastMouseY: 0 },
+    { id: 'youtube', name: 'YouTube Ads', category: 'ad', color: '#FF0000', icon: <YouTubeIcon size={26} />, hint: 'Video Cost, Views, Dates', angleDeg: 216, x: 450, y: 60, vx: 0.2, vy: 0.8, radius: 28, mass: 1, isDragging: false, dragOffsetX: 0, dragOffsetY: 0, lastMouseX: 0, lastMouseY: 0 },
+    { id: 'linkedin', name: 'LinkedIn Ads', category: 'ad', color: '#0A66C2', icon: <LinkedInIcon size={26} />, hint: 'Total Spent, Start Date', angleDeg: 252, x: 300, y: 500, vx: 0.6, vy: -0.6, radius: 28, mass: 1, isDragging: false, dragOffsetX: 0, dragOffsetY: 0, lastMouseX: 0, lastMouseY: 0 },
+    { id: 'apple', name: 'Apple Search', category: 'ad', color: '#0071E3', icon: <AppleIcon size={26} />, hint: 'Spend & Search Terms', angleDeg: 288, x: 620, y: 500, vx: -0.7, vy: 0.3, radius: 28, mass: 1, isDragging: false, dragOffsetX: 0, dragOffsetY: 0, lastMouseX: 0, lastMouseY: 0 },
+    { id: 'pinterest', name: 'Pinterest Ads', category: 'ad', color: '#E60023', icon: <PinterestIcon size={26} />, hint: 'Paid Spend & Pin Clicks', angleDeg: 324, x: 460, y: 510, vx: 0.4, vy: 0.5, radius: 28, mass: 1, isDragging: false, dragOffsetX: 0, dragOffsetY: 0, lastMouseX: 0, lastMouseY: 0 },
+  ]);
 
-  // Trigger convergence animation smoothly after mount
+  // Forces re-render on physics tick
+  const [, setTick] = useState<number>(0);
+
+  // Active dragging ref for mouse tracking
+  const activeDragNodeId = useRef<string | null>(null);
+
+  // 60FPS Physics Simulation Engine Loop
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setConverged(true);
-    }, 900);
-    return () => clearTimeout(timer);
+    let lastTime = performance.now();
+
+    const physicsLoop = (now: number) => {
+      const dt = Math.min((now - lastTime) / 1000, 0.05); // cap delta time to 50ms
+      lastTime = now;
+
+      const arena = arenaRef.current;
+      if (arena) {
+        const width = arena.clientWidth || 900;
+        const height = arena.clientHeight || 560;
+        const centerX = width / 2;
+        const centerY = height / 2;
+
+        const nodes = nodesRef.current;
+        const n = nodes.length;
+
+        // Central Dropzone bounding obstacle
+        const dropBox = {
+          left: centerX - 230,
+          right: centerX + 230,
+          top: centerY - 150,
+          bottom: centerY + 150,
+        };
+
+        // 1. Apply Forces to each node
+        for (let i = 0; i < n; i++) {
+          const node = nodes[i];
+
+          if (node.isDragging) {
+            // Dragged by user cursor: velocity damped
+            continue;
+          }
+
+          if (converged) {
+            // CONVERGED MODE: Spring force pulling node to its designated orbit position
+            const rad = (node.angleDeg * Math.PI) / 180;
+            const orbitRx = Math.min(320, width * 0.35);
+            const orbitRy = Math.min(220, height * 0.36);
+            const targetX = centerX + Math.cos(rad) * orbitRx;
+            const targetY = centerY + Math.sin(rad) * orbitRy;
+
+            const springK = 8.5; // spring stiffness
+            const fx = -springK * (node.x - targetX);
+            const fy = -springK * (node.y - targetY);
+
+            // Ambient breathing drift
+            const driftX = Math.sin(now * 0.002 + i) * 6.0;
+            const driftY = Math.cos(now * 0.002 + i) * 6.0;
+
+            node.vx += (fx + driftX) * dt;
+            node.vy += (fy + driftY) * dt;
+
+            // Damping / friction
+            node.vx *= 0.92;
+            node.vy *= 0.92;
+          } else {
+            // DISPERSED / FREE FLOAT MODE: Brownian organic drift
+            const driftX = Math.sin(now * 0.0015 + i * 2) * 12.0;
+            const driftY = Math.cos(now * 0.0018 + i * 2) * 12.0;
+
+            node.vx += driftX * dt;
+            node.vy += driftY * dt;
+
+            // Gentle air resistance
+            node.vx *= 0.97;
+            node.vy *= 0.97;
+          }
+
+          // Position update
+          node.x += node.vx * dt * 50;
+          node.y += node.vy * dt * 50;
+
+          // Arena boundary elastic collision
+          if (node.x - node.radius < 12) {
+            node.x = 12 + node.radius;
+            node.vx = -node.vx * 0.75;
+          } else if (node.x + node.radius > width - 12) {
+            node.x = width - 12 - node.radius;
+            node.vx = -node.vx * 0.75;
+          }
+
+          if (node.y - node.radius < 12) {
+            node.y = 12 + node.radius;
+            node.vy = -node.vy * 0.75;
+          } else if (node.y + node.radius > height - 12) {
+            node.y = height - 12 - node.radius;
+            node.vy = -node.vy * 0.75;
+          }
+
+          // Elastic bounce off central dropzone box (only if thrown directly inside)
+          if (
+            node.x + node.radius > dropBox.left &&
+            node.x - node.radius < dropBox.right &&
+            node.y + node.radius > dropBox.top &&
+            node.y - node.radius < dropBox.bottom
+          ) {
+            // Determine shallowest penetration edge
+            const dLeft = Math.abs(node.x - dropBox.left);
+            const dRight = Math.abs(node.x - dropBox.right);
+            const dTop = Math.abs(node.y - dropBox.top);
+            const dBottom = Math.abs(node.y - dropBox.bottom);
+            const minD = Math.min(dLeft, dRight, dTop, dBottom);
+
+            if (minD === dLeft) {
+              node.x = dropBox.left - node.radius;
+              node.vx = -Math.abs(node.vx) * 0.8;
+            } else if (minD === dRight) {
+              node.x = dropBox.right + node.radius;
+              node.vx = Math.abs(node.vx) * 0.8;
+            } else if (minD === dTop) {
+              node.y = dropBox.top - node.radius;
+              node.vy = -Math.abs(node.vy) * 0.8;
+            } else {
+              node.y = dropBox.bottom + node.radius;
+              node.vy = Math.abs(node.vy) * 0.8;
+            }
+          }
+        }
+
+        // 2. Mutual Repulsion / Elastic Collisions between Nodes
+        for (let i = 0; i < n; i++) {
+          for (let j = i + 1; j < n; j++) {
+            const nA = nodes[i];
+            const nB = nodes[j];
+
+            const dx = nB.x - nA.x;
+            const dy = nB.y - nA.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const minDist = nA.radius + nB.radius + 6; // 62px separation
+
+            if (dist < minDist && dist > 0.001) {
+              const overlap = (minDist - dist) * 0.5;
+              const nx = dx / dist;
+              const ny = dy / dist;
+
+              // Push apart
+              if (!nA.isDragging) {
+                nA.x -= nx * overlap;
+                nA.y -= ny * overlap;
+              }
+              if (!nB.isDragging) {
+                nB.x += nx * overlap;
+                nB.y += ny * overlap;
+              }
+
+              // Elastic velocity exchange along normal
+              const kx = nA.vx - nB.vx;
+              const ky = nA.vy - nB.vy;
+              const p = 2 * (nx * kx + ny * ky) / (nA.mass + nB.mass);
+
+              if (!nA.isDragging) {
+                nA.vx -= p * nB.mass * nx * 0.85;
+                nA.vy -= p * nB.mass * ny * 0.85;
+              }
+              if (!nB.isDragging) {
+                nB.vx += p * nA.mass * nx * 0.85;
+                nB.vy += p * nA.mass * ny * 0.85;
+              }
+            }
+          }
+        }
+      }
+
+      setTick(now);
+      animFrameRef.current = requestAnimationFrame(physicsLoop);
+    };
+
+    animFrameRef.current = requestAnimationFrame(physicsLoop);
+    return () => {
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    };
+  }, [converged]);
+
+  // Mouse & Touch Drag and Toss Handlers
+  const handleNodeMouseDown = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    const arena = arenaRef.current;
+    if (!arena) return;
+
+    const rect = arena.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    const node = nodesRef.current.find((n) => n.id === id);
+    if (node) {
+      node.isDragging = true;
+      node.dragOffsetX = mouseX - node.x;
+      node.dragOffsetY = mouseY - node.y;
+      node.lastMouseX = mouseX;
+      node.lastMouseY = mouseY;
+      node.vx = 0;
+      node.vy = 0;
+      activeDragNodeId.current = id;
+    }
+  };
+
+  const handleArenaMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!activeDragNodeId.current || !arenaRef.current) return;
+    const rect = arenaRef.current.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    const node = nodesRef.current.find((n) => n.id === activeDragNodeId.current);
+    if (node && node.isDragging) {
+      node.x = mouseX - node.dragOffsetX;
+      node.y = mouseY - node.dragOffsetY;
+
+      // Calculate instantaneous throw velocity from mouse motion
+      node.vx = (mouseX - node.lastMouseX) * 0.8;
+      node.vy = (mouseY - node.lastMouseY) * 0.8;
+
+      node.lastMouseX = mouseX;
+      node.lastMouseY = mouseY;
+    }
+  }, []);
+
+  const handleArenaMouseUp = useCallback(() => {
+    if (activeDragNodeId.current) {
+      const node = nodesRef.current.find((n) => n.id === activeDragNodeId.current);
+      if (node) {
+        node.isDragging = false;
+        // Launch with momentum
+        node.vx = Math.max(-25, Math.min(25, node.vx * 1.5));
+        node.vy = Math.max(-25, Math.min(25, node.vy * 1.5));
+      }
+      activeDragNodeId.current = null;
+    }
   }, []);
 
   const handleFiles = (files: FileList | null) => {
@@ -103,7 +345,7 @@ export const DataConvergenceNexus: React.FC<NexusProps> = ({ onDatasetLoaded }) 
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    setIsDragging(false);
+    setIsDraggingFile(false);
     handleFiles(e.dataTransfer.files);
   };
 
@@ -126,7 +368,7 @@ export const DataConvergenceNexus: React.FC<NexusProps> = ({ onDatasetLoaded }) 
     <section id="connect-nexus" style={{ padding: '80px 0 60px', position: 'relative', overflow: 'hidden' }}>
       <div className="container" style={{ position: 'relative', zIndex: 10 }}>
         {/* Section Header */}
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
           <div style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -143,7 +385,7 @@ export const DataConvergenceNexus: React.FC<NexusProps> = ({ onDatasetLoaded }) 
             marginBottom: '14px'
           }}>
             <Layers size={14} />
-            Universal Multi-Platform Data Convergence
+            Physics-Enabled Multi-Platform Convergence
           </div>
 
           <h2 style={{
@@ -156,117 +398,115 @@ export const DataConvergenceNexus: React.FC<NexusProps> = ({ onDatasetLoaded }) 
             Connect Any Platform in <span style={{ color: '#3B82F6' }}>CSV Format</span>
           </h2>
           <p style={{ color: '#94A3B8', maxWidth: '720px', margin: '14px auto 0', fontSize: '1.02rem', lineHeight: 1.6 }}>
-            Every ad platform can export a CSV. Drop exports from Meta, Google, TikTok, Amazon, or your store.
-            Our engine automatically fingerprints column headers, converts currencies, and harmonizes daily rows into an MMM econometric matrix.
+            Every ad platform can export a CSV. Drag and throw the physics-enabled icons or drop files directly onto the hub.
+            Our engine auto-fingerprints headers, normalizes currencies, and aggregates into a weekly econometric matrix.
           </p>
 
-          {/* Toggle Animation State */}
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginTop: '20px' }}>
+          {/* Interactive Physics Mode Toggle & Hint */}
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '18px', flexWrap: 'wrap' }}>
             <button
               onClick={() => setConverged(!converged)}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '8px',
-                padding: '6px 14px',
+                padding: '6px 16px',
                 borderRadius: '8px',
                 fontSize: '0.78rem',
                 fontWeight: 600,
-                backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                color: '#94A3B8',
-                cursor: 'pointer'
+                backgroundColor: converged ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                border: `1px solid ${converged ? 'rgba(59, 130, 246, 0.35)' : 'rgba(255, 255, 255, 0.1)'}`,
+                color: converged ? '#60A5FA' : '#94A3B8',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
               }}
             >
               <RefreshCw size={13} />
-              {converged ? 'Disperse Constellation' : 'Gravitate to Center'}
+              {converged ? 'Gravity Mode: Orbital Lock' : 'Gravity Mode: Free Float Constellation'}
             </button>
+
+            <span style={{ fontSize: '0.75rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Move size={12} />
+              Grab & toss any icon with your cursor
+            </span>
           </div>
         </div>
 
-        {/* The Animated Arena Container */}
-        <div style={{
-          position: 'relative',
-          minHeight: '520px',
-          borderRadius: '24px',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          backgroundColor: 'rgba(14, 19, 31, 0.7)',
-          backdropFilter: 'blur(20px)',
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.6)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '40px 20px',
-          overflow: 'hidden'
-        }}>
-          {/* Subtle Ambient Rings */}
+        {/* Physics-Enabled Arena Container */}
+        <div
+          ref={arenaRef}
+          onMouseMove={handleArenaMouseMove}
+          onMouseUp={handleArenaMouseUp}
+          onMouseLeave={handleArenaMouseUp}
+          style={{
+            position: 'relative',
+            minHeight: '560px',
+            borderRadius: '24px',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            backgroundColor: 'rgba(14, 19, 31, 0.7)',
+            backdropFilter: 'blur(20px)',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            overflow: 'hidden',
+            userSelect: 'none'
+          }}
+        >
+          {/* Visual Orbital Guides */}
           <div style={{
             position: 'absolute',
-            width: '440px',
-            height: '440px',
+            width: '460px',
+            height: '460px',
             borderRadius: '50%',
-            border: '1px dashed rgba(59, 130, 246, 0.15)',
-            pointerEvents: 'none',
-            transform: converged ? 'scale(1)' : 'scale(1.4)',
-            transition: 'transform 1.2s cubic-bezier(0.16, 1, 0.3, 1)'
+            border: '1px dashed rgba(59, 130, 246, 0.14)',
+            pointerEvents: 'none'
           }} />
           <div style={{
             position: 'absolute',
-            width: '620px',
-            height: '620px',
+            width: '680px',
+            height: '680px',
             borderRadius: '50%',
-            border: '1px dashed rgba(6, 182, 212, 0.08)',
-            pointerEvents: 'none',
-            transform: converged ? 'scale(1)' : 'scale(1.3)',
-            transition: 'transform 1.2s cubic-bezier(0.16, 1, 0.3, 1)'
+            border: '1px dashed rgba(6, 182, 212, 0.06)',
+            pointerEvents: 'none'
           }} />
 
-          {/* Floating / Converging Platform Icons */}
-          {platforms.map((p) => {
+          {/* Physics Platform Nodes */}
+          {nodesRef.current.map((p) => {
             const isConnected = isPlatformConnected(p.id);
-
-            // Compute positions
-            // Converged: on an elliptical orbit
-            const rad = (p.convergeAngle * Math.PI) / 180;
-            const orbitRadiusX = 260;
-            const orbitRadiusY = 190;
-            const targetX = 50 + (Math.cos(rad) * orbitRadiusX) / 8;
-            const targetY = 50 + (Math.sin(rad) * orbitRadiusY) / 5;
-
-            const posX = converged ? targetX : p.floatX;
-            const posY = converged ? targetY : p.floatY;
 
             return (
               <div
                 key={p.id}
+                onMouseDown={(e) => handleNodeMouseDown(e, p.id)}
                 onMouseEnter={() => setHoveredNode(p.id)}
                 onMouseLeave={() => setHoveredNode(null)}
                 style={{
                   position: 'absolute',
-                  left: `${posX}%`,
-                  top: `${posY}%`,
+                  left: `${p.x}px`,
+                  top: `${p.y}px`,
                   transform: 'translate(-50%, -50%)',
-                  transition: 'left 1.2s cubic-bezier(0.16, 1, 0.3, 1), top 1.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s',
-                  zIndex: hoveredNode === p.id ? 40 : 20,
-                  cursor: 'pointer'
+                  zIndex: p.isDragging ? 50 : hoveredNode === p.id ? 40 : 25,
+                  cursor: p.isDragging ? 'grabbing' : 'grab'
                 }}
               >
                 <div style={{
                   position: 'relative',
-                  width: '56px',
-                  height: '56px',
+                  width: `${p.radius * 2}px`,
+                  height: `${p.radius * 2}px`,
                   borderRadius: '16px',
-                  backgroundColor: isConnected ? 'rgba(16, 185, 129, 0.15)' : 'rgba(18, 24, 38, 0.95)',
-                  border: `2px solid ${isConnected ? '#10B981' : hoveredNode === p.id ? p.color : 'rgba(255, 255, 255, 0.12)'}`,
+                  backgroundColor: isConnected ? 'rgba(16, 185, 129, 0.18)' : 'rgba(18, 24, 38, 0.95)',
+                  border: `2px solid ${isConnected ? '#10B981' : hoveredNode === p.id || p.isDragging ? p.color : 'rgba(255, 255, 255, 0.12)'}`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   boxShadow: isConnected
-                    ? '0 0 25px rgba(16, 185, 129, 0.5)'
-                    : hoveredNode === p.id
-                    ? `0 0 25px ${p.color}60`
-                    : '0 8px 24px rgba(0, 0, 0, 0.4)',
-                  transition: 'all 0.25s ease'
+                    ? '0 0 25px rgba(16, 185, 129, 0.55)'
+                    : p.isDragging || hoveredNode === p.id
+                    ? `0 0 25px ${p.color}80`
+                    : '0 8px 24px rgba(0, 0, 0, 0.5)',
+                  transition: p.isDragging ? 'none' : 'box-shadow 0.2s, border-color 0.2s'
                 }}>
                   {p.icon}
 
@@ -292,7 +532,7 @@ export const DataConvergenceNexus: React.FC<NexusProps> = ({ onDatasetLoaded }) 
                 </div>
 
                 {/* Tooltip on Hover */}
-                {hoveredNode === p.id && (
+                {hoveredNode === p.id && !p.isDragging && (
                   <div style={{
                     position: 'absolute',
                     bottom: '68px',
@@ -318,17 +558,17 @@ export const DataConvergenceNexus: React.FC<NexusProps> = ({ onDatasetLoaded }) 
 
           {/* Central Magnetic Dropzone Box */}
           <div
-            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-            onDragLeave={() => setIsDragging(false)}
+            onDragOver={(e) => { e.preventDefault(); setIsDraggingFile(true); }}
+            onDragLeave={() => setIsDraggingFile(false)}
             onDrop={handleDrop}
             style={{
               width: '100%',
               maxWidth: '460px',
               padding: '36px 28px',
               borderRadius: '20px',
-              backgroundColor: isDragging ? 'rgba(59, 130, 246, 0.15)' : 'rgba(7, 9, 14, 0.88)',
-              border: `2px dashed ${isDragging ? '#3B82F6' : dataset ? 'rgba(16, 185, 129, 0.4)' : 'rgba(255, 255, 255, 0.18)'}`,
-              boxShadow: isDragging ? '0 0 40px rgba(59, 130, 246, 0.4)' : '0 12px 40px rgba(0, 0, 0, 0.6)',
+              backgroundColor: isDraggingFile ? 'rgba(59, 130, 246, 0.15)' : 'rgba(7, 9, 14, 0.92)',
+              border: `2px dashed ${isDraggingFile ? '#3B82F6' : dataset ? 'rgba(16, 185, 129, 0.4)' : 'rgba(255, 255, 255, 0.18)'}`,
+              boxShadow: isDraggingFile ? '0 0 40px rgba(59, 130, 246, 0.4)' : '0 12px 40px rgba(0, 0, 0, 0.7)',
               textAlign: 'center',
               position: 'relative',
               zIndex: 30,
