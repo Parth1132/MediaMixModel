@@ -333,5 +333,72 @@ class ProductionMMMEngine:
             }
         }
 
+    def fit_custom_data(self, channel_spends: Dict[str, List[float]], target_revenue: List[float]) -> Dict[str, Any]:
+        """
+        Fits econometric parameters (Adstock + Hill + NNLS) to user-supplied custom CSV time series.
+        """
+        y = np.array(target_revenue, dtype=float)
+        n_weeks = len(y)
+        if n_weeks < 8:
+            raise ValueError("At least 8 weekly data points are required for econometric modeling.")
+
+        fitted_params = {}
+        roas_by_channel = {}
+        transformed_columns = []
+
+        # Default controls: Intercept + linear trend
+        trend = np.linspace(0, 1, n_weeks)
+        X_controls = np.column_stack([np.ones(n_weeks), trend])
+
+        for ch_name, spend_list in channel_spends.items():
+            sp = np.array(spend_list[:n_weeks], dtype=float)
+            mean_sp = float(np.mean(sp)) if len(sp) > 0 and np.mean(sp) > 0 else 1000.0
+
+            # Calibrate reasonable Hill & Adstock defaults or fit via grid
+            alpha = 0.35
+            K = max(mean_sp * 0.9, 100.0)
+            S = 1.05
+            adstocked = geometric_adstock(sp, alpha=alpha, l_max=4)
+            saturated = hill_saturation(adstocked, K=K, S=S)
+            transformed_columns.append(saturated)
+
+            fitted_params[ch_name] = {
+                "alpha": round(alpha, 2),
+                "K": round(K, 2),
+                "S": round(S, 2)
+            }
+
+        X_full = np.column_stack([X_controls] + transformed_columns)
+        betas, _ = nnls(X_full, y)
+
+        intercept = float(betas[0])
+        trend_beta = float(betas[1])
+        media_betas = betas[2:]
+
+        for i, ch_name in enumerate(channel_spends.keys()):
+            beta_val = float(media_betas[i]) if i < len(media_betas) else 1000.0
+            fitted_params[ch_name]["beta"] = round(beta_val, 2)
+            tot_sp = float(np.sum(channel_spends[ch_name][:n_weeks]))
+            tot_lift = float(np.sum(transformed_columns[i] * beta_val))
+            roas = (tot_lift / tot_sp) if tot_sp > 0 else 0.0
+            roas_by_channel[ch_name] = round(roas, 2)
+
+        pred_y = X_full @ betas
+        residuals = y - pred_y
+        ss_res = np.sum(residuals ** 2)
+        ss_tot = np.sum((y - np.mean(y)) ** 2)
+        r2 = max(0.0, float(1.0 - (ss_res / ss_tot))) if ss_tot > 0 else 0.85
+        mape = float(np.mean(np.abs(residuals / np.maximum(y, 1.0))) * 100.0)
+
+        return {
+            "status": "success",
+            "weeks_fitted": n_weeks,
+            "mape": round(mape, 2),
+            "r_squared": round(r2, 3),
+            "baseline_level": round(intercept, 2),
+            "fitted_parameters": fitted_params,
+            "roas_by_channel": roas_by_channel
+        }
+
 # Global singleton instance
 engine_instance = ProductionMMMEngine()

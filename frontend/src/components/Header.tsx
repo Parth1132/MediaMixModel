@@ -66,6 +66,12 @@ export const Header: React.FC<HeaderProps> = ({ backendConnected }) => {
           </div>
 
           <a
+            href="#connect-nexus"
+            style={{ color: '#60A5FA', textDecoration: 'none', fontSize: '0.88rem', fontWeight: 600 }}
+          >
+            Connect Data (CSV)
+          </a>
+          <a
             href="#simulator"
             style={{ color: '#94A3B8', textDecoration: 'none', fontSize: '0.88rem', fontWeight: 500 }}
           >

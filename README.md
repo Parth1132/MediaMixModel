@@ -59,6 +59,16 @@ Media Mix Modeling (MMM) operates independently from user-level tracking by anal
 
 ---
 
+## 💫 Universal Data Convergence Nexus (v2.0)
+Connect any marketing platform without API review friction:
+- **Animated Convergence**: 10 floating platform icons (Meta, Google, TikTok, Amazon, YouTube, LinkedIn, Apple Search, Pinterest, Shopify, Stripe) gravitate into an orbital ring surrounding a unified dropzone.
+- **Zero-Config Header Fingerprinting**: Auto-detects column names (`Amount Spent`, `Cost`, `Day`, `Total Sales`, `Orders`).
+- **Currency & Punctuation Sanitization**: Automatically strips symbols (`$`, `€`, `₹`, `£`, commas).
+- **Monday-to-Sunday Aggregation**: Smooths out high-frequency daily noise into clean 52-to-104 week econometric series.
+- **⚡ 1-Click Demo Brand Dataset**: Immediate exploration with 2 years of multi-channel e-commerce data.
+
+---
+
 ## 🚀 Getting Started
 
 ### 1. Python Backend (FastAPI)

@@ -109,5 +109,22 @@ class TestMMMEngine(unittest.TestCase):
         self.assertIn("mape", data)
         self.assertIn("overall_roas", data)
 
+    def test_api_fit_custom(self):
+        payload = {
+            "channel_spends": {
+                "meta": [10000.0 + i * 200 for i in range(12)],
+                "google": [6000.0 + i * 150 for i in range(12)]
+            },
+            "target_revenue": [80000.0 + i * 1000 for i in range(12)]
+        }
+        res = self.client.post("/api/fit-custom", json=payload)
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["status"], "success")
+        self.assertEqual(data["weeks_fitted"], 12)
+        self.assertIn("fitted_parameters", data)
+        self.assertIn("roas_by_channel", data)
+
+
 if __name__ == "__main__":
     unittest.main()

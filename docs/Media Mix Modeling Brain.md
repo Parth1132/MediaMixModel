@@ -2,7 +2,7 @@
 type: brain
 role: econometric_attribution_and_budget_optimization
 domain: media_mix_modeling
-version: 1.0.0
+version: 2.0.0
 status: active
 author: Parth Mishra
 created: 2026-11-04
@@ -18,6 +18,7 @@ tags:
   - mmm
   - econometrics
   - attribution
+  - data-ingestion
   - adstock
   - hill-saturation
   - budget-optimization
@@ -51,11 +52,20 @@ The **Media Mix Modeling (MMM) Brain** is the independent econometric intelligen
 
 ```mermaid
 flowchart TD
-    subgraph Data_Sources [Aggregated Upstream Ingestion]
-        CRM["[[CRM Data]]<br/>Real Net Revenue & Orders"]
-        GA4["[[GA4 Data]]<br/>Session & Web Traffic"]
-        AF["[[AppsFlyer Data]]<br/>MMP App Conversions"]
-        BR["[[Branch Data]]<br/>Deep Link Touchpoints"]
+    subgraph Data_Convergence [Universal Multi-Platform Ingestion]
+        direction TB
+        Meta["Meta Ads CSV<br/>(Amount Spent, Reporting Starts)"]
+        Google["Google Ads CSV<br/>(Cost, Day, Impr.)"]
+        TikTok["TikTok Ads CSV<br/>(Total Cost, Stat Date)"]
+        Amazon["Amazon Ads CSV<br/>(Spend, Date)"]
+        Shopify["Shopify / Stripe CSV<br/>(Total Net Sales, Orders)"]
+    end
+
+    subgraph Preprocessing_Pipeline [Harmonization & Fingerprinting]
+        SigDetect["Header Fingerprint Matcher<br/>(Zero-Config Column Detection)"]
+        Clean["Sanitization<br/>(Strip Currency $, €, ₹, Commas)"]
+        Temporal["Monday-to-Sunday Aggregation<br/>(Filter Daily Random Noise)"]
+        MatrixJoin["Timeline Harmonization<br/>(Align on Overlapping Weeks)"]
     end
 
     subgraph Econometric_Engine [Media Mix Modeling Engine (Python + SciPy)]
@@ -64,13 +74,6 @@ flowchart TD
         Hill["Hill Saturation Function<br/>(Half-Sat K, Slope S)"]
         NNLS["Non-Negative Least Squares<br/>(Enforce β_media ≥ 0)"]
         SLSQP["SLSQP Budget Optimizer<br/>(Marginal ROAS Equalization)"]
-    end
-
-    subgraph Channels [Acquisition Channels]
-        Meta["[[Meta Ads Channel]]"]
-        Google["[[Google Ads Channel]]"]
-        Apple["[[Apple Search Ads Channel]]"]
-        Reddit["[[Reddit Ads Channel]]"]
     end
 
     subgraph Decision_Brains [Peer Strategic Brains]
@@ -83,8 +86,9 @@ flowchart TD
         Heart["[[00_THE_HEART]]<br/>Executive Blended ROAS & Pipeline"]
     end
 
-    CRM & GA4 & AF & BR --> Base
-    Channels --> Adstock --> Hill --> NNLS --> SLSQP
+    Meta & Google & TikTok & Amazon & Shopify --> SigDetect --> Clean --> Temporal --> MatrixJoin
+    MatrixJoin --> Base & Adstock
+    Adstock --> Hill --> NNLS --> SLSQP
     Base --> NNLS
     SLSQP --> Budget
     NNLS --> Track
@@ -93,9 +97,37 @@ flowchart TD
 
 ---
 
-## 2. Mathematical & Econometric Formulations
+## 2. Universal Data Ingestion & Harmonization (v2.0)
 
-### 2.1 Geometric Memory Carryover (Adstock)
+### 2.1 Header Fingerprint Signatures
+Marketing export files vary widely across advertising platforms. The v2.0 ingestion engine uses automated signature detection to extract the required date and spend vectors without requiring manual reformatting:
+
+| Ad Platform | Target Spend Column Matchers | Date / Time Column Matchers | Additional Identifiers |
+|---|---|---|---|
+| **Meta Ads** | `Amount Spent (USD)`, `Amount spent`, `Spend` | `Reporting Starts`, `Date`, `Day` | `Ad Set Name`, `Campaign Name` |
+| **Google Ads** | `Cost`, `Spend` | `Day`, `Date` | `Impr.`, `Customer ID`, `Campaign state` |
+| **TikTok Ads** | `Total Cost`, `Cost`, `Spend` | `Stat Date`, `Date` | `Campaign Name (ID)`, `Tiktok` |
+| **Amazon Ads** | `Spend`, `Cost` | `Date`, `Day` | `7 Day Total Sales`, `Amazon` |
+| **LinkedIn Ads** | `Total Spent`, `Spent`, `Cost` | `Start Date (UTC)`, `Date` | `Campaign Name`, `LinkedIn` |
+| **Shopify / Stripe** | `Total Sales`, `Net Sales`, `Gross Sales` | `Day`, `Date`, `Month` | `Orders`, `Refunds` |
+| **Generic Ad Network** | `*spend*`, `*cost*`, `*budget*` | `*date*`, `*day*`, `*week*` | Fallback signature matcher |
+
+### 2.2 Currency & Punctuation Sanitization
+All monetary columns are normalized through regular expression filtering:
+$$\text{CleanValue}(x) = \text{parseFloat}\left(\text{RegexReplace}(x, `[\$,€,₹,£,\s]`, ``)\right)$$
+
+### 2.3 Temporal Aggregation (Daily to Monday-Weekly)
+Daily marketing data suffers from high-frequency weekly noise (e.g., Saturday dips, Wednesday spikes). The ingestion pipeline aggregates daily records into Monday-indexed weekly buckets:
+
+$$\text{MondayWeek}(D) = D - \left( \text{DayOfWeek}(D) - 1 \right) \quad \text{days}$$
+
+$$X_{w, \text{channel}} = \sum_{d \in w} X_{d, \text{channel}}$$
+
+---
+
+## 3. Mathematical & Econometric Formulations
+
+### 3.1 Geometric Memory Carryover (Adstock)
 Marketing impressions do not dissipate immediately. Consumer exposure accumulates psychological memory that decays over subsequent time periods $t$:
 
 $$A_t = \sum_{l=0}^{L_{\max}-1} w_l X_{t-l}, \quad \text{where } w_l = \frac{\alpha^l}{\sum_{k=0}^{L_{\max}-1} \alpha^k}$$
@@ -103,7 +135,7 @@ $$A_t = \sum_{l=0}^{L_{\max}-1} w_l X_{t-l}, \quad \text{where } w_l = \frac{\al
 - $\alpha \in [0, 1)$: Memory retention coefficient (e.g., Linear/CTV $\alpha = 0.65$, Search $\alpha = 0.12$).
 - $L_{\max}$: Maximum carryover window in weeks (default: 8 weeks for brand channels, 2 weeks for capture channels).
 
-### 2.2 Hill Saturation & Diminishing Marginal Returns
+### 3.2 Hill Saturation & Diminishing Marginal Returns
 Channel yield conforms to sigmoidal or concave diminishing returns as audience frequency saturates:
 
 $$S(x) = \frac{x^S}{x^S + K^S}$$
@@ -111,19 +143,19 @@ $$S(x) = \frac{x^S}{x^S + K^S}$$
 - $K > 0$: **Half-saturation constant** — the spend level generating exactly 50% of maximum potential media lift.
 - $S > 0$: **Hill slope / shape parameter** ($S > 1$ represents S-shaped sigmoidal pickup; $S \le 1$ represents immediate concave decay).
 
-### 2.3 Exact Marginal Return Derivative ($mROAS$)
+### 3.3 Exact Marginal Return Derivative ($mROAS$)
 To identify the exact dollar return for the next incremental dollar spent on channel $i$:
 
 $$\text{Revenue}_i(x) = \beta_i \cdot \frac{x^{S_i}}{x^{S_i} + K_i^{S_i}}$$
 
 $$\frac{d\text{Revenue}_i}{dx} = \beta_i \cdot \frac{S_i \cdot K_i^{S_i} \cdot x^{S_i - 1}}{\left(x^{S_i} + K_i^{S_i}\right)^2}$$
 
-### 2.4 Non-Negative Least Squares (NNLS) Regularization
+### 3.4 Non-Negative Least Squares (NNLS) Regularization
 Standard OLS regression frequently assigns uninterpretable negative coefficients to correlated advertising media. We constrain estimation to non-negative parameter space:
 
 $$\min_{\beta} \| Y - X \beta \|_2^2 \quad \text{subject to } \beta_{\text{media}} \ge 0$$
 
-### 2.5 SLSQP Constrained Budget Optimization
+### 3.5 SLSQP Constrained Budget Optimization
 To maximize total revenue across $M$ channels subject to a fixed total marketing budget $B$ and organizational channel boundaries $[L_i, U_i]$:
 
 $$\max_{\{x_1, \dots, x_M\}} \sum_{i=1}^M \beta_i \cdot \frac{x_i^{S_i}}{x_i^{S_i} + K_i^{S_i}}$$
@@ -136,59 +168,23 @@ $$\frac{d\text{Revenue}_1}{dx_1} = \frac{d\text{Revenue}_2}{dx_2} = \dots = \fra
 
 ---
 
-## 3. Calibrated Channel Parameters
-
-| Channel | Linked Vault Node | Retention ($\alpha$) | Half-Sat ($K$) | Slope ($S$) | Max Scale ($\beta$) | Historical ROAS | Marginal Threshold |
-|---|---|---|---|---|---|---|---|
-| **Linear & CTV** | `[[Meta Ads Channel]]` / Offline | 0.65 | \$18,000 / mo | 1.30 | \$45,000 | 1.84x | \$1.00 Floor |
-| **Paid Social** | `[[Meta Ads Channel]]` | 0.35 | \$9,000 / mo | 1.00 | \$28,000 | 2.31x | \$1.15 Target |
-| **Paid Search** | `[[Google Ads Channel]]` | 0.12 | \$6,000 / mo | 0.90 | \$22,000 | 2.89x | \$1.30 Target |
-| **App Store Ads** | `[[Apple Search Ads Channel]]` | 0.18 | \$7,500 / mo | 0.95 | \$19,500 | 2.45x | \$1.20 Target |
-| **Community Ads** | `[[Reddit Ads Channel]]` | 0.28 | \$5,000 / mo | 1.05 | \$14,000 | 1.95x | \$1.10 Target |
-
----
-
 ## 4. Software Architecture & API Interface
 
 The production system is deployed as a dual-tier full-stack application:
 - **Backend**: Python 3.15 + **FastAPI** + **NumPy** + **SciPy** (`backend/`)
 - **Frontend**: **React 19** + **TypeScript** + **Vite** (`frontend/`)
 
-### 4.1 REST API Specification
+### 4.1 Endpoints Summary
 
-```
-POST /api/simulate
-Content-Type: application/json
-
-Request:
-{
-  "total_budget": 80000.0,
-  "tv_pct": 55.0,
-  "social_pct": 30.0,
-  "search_pct": 15.0
-}
-
-Response (200 OK):
-{
-  "total_budget": 80000.0,
-  "baseline_revenue": 100000.0,
-  "current_total_revenue": 164200.0,
-  "optimal_total_revenue": 182650.0,
-  "dollar_lift": 18450.0,
-  "percentage_lift": 11.2,
-  "current_channels": { ... },
-  "optimal_channels": { ... }
-}
-```
-
-### 4.2 Endpoints Summary
-
-- `GET /api/health` — Engine operational status & versioning.
-- `GET /api/channels` — Calibrated prior parameters ($K$, $S$, $\beta$, $\alpha$).
-- `POST /api/simulate` — Real-time marketing mix simulation vs SLSQP optimum.
-- `POST /api/optimize` — Multi-channel budget solver with spend constraints.
-- `GET /api/curves` — Coordinate arrays for Hill response and marginal return curves.
-- `GET /api/decomposition` — 52-week time-series decomposition (Baseline vs Media Lift).
+| Method | Path | Functionality |
+|---|---|---|
+| `GET` | `/api/health` | Engine operational status & versioning. |
+| `GET` | `/api/channels` | Calibrated prior parameters ($K$, $S$, $\beta$, $\alpha$). |
+| `POST` | `/api/simulate` | Real-time marketing mix simulation vs SLSQP optimum. |
+| `POST` | `/api/optimize` | Multi-channel budget solver with spend constraints. |
+| `GET` | `/api/curves` | Coordinate arrays for Hill response and marginal return curves. |
+| `GET` | `/api/decomposition` | 52-week time-series decomposition (Baseline vs Media Lift). |
+| `POST` | `/api/fit-custom` | Calibrates Adstock & Hill parameters to user-uploaded CSV matrices. |
 
 ---
 
@@ -224,4 +220,5 @@ Response (200 OK):
 
 ## 7. Versioning & Change Log
 
-- **v1.0.0 (2026-11-05)**: Full release of Media Mix Modeling Brain with React frontend and Python FastAPI backend. Integrated with Obsidian Vault nodes (`00_THE_HEART`, `Budget Brain`, `Tracking Brain`). Author: Partha Mishra.
+- **v2.0.0 (2026-11-05)**: Added Universal Data Convergence Nexus with animated platform gravitational orbit, multi-CSV header fingerprinting, 1-click brand dataset, and custom matrix fitting endpoint `/api/fit-custom`.
+- **v1.0.0 (2026-11-05)**: Initial full-stack release with React frontend, Python FastAPI backend, and Obsidian MMM Brain specification.

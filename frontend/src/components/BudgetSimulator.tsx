@@ -2,12 +2,28 @@ import React, { useState, useEffect } from 'react';
 import { Sliders, Sparkles } from 'lucide-react';
 import type { SimulationResult } from '../types';
 import { simulateAllocation } from '../services/api';
+import type { HarmonizedDataset } from '../services/csvParser';
 
-export const BudgetSimulator: React.FC = () => {
+interface BudgetSimulatorProps {
+  harmonizedData?: HarmonizedDataset | null;
+}
+
+export const BudgetSimulator: React.FC<BudgetSimulatorProps> = ({ harmonizedData }) => {
   const [totalBudget, setTotalBudget] = useState<number>(80000);
   const [tvPct, setTvPct] = useState<number>(55);
   const [socialPct, setSocialPct] = useState<number>(30);
   const [simResult, setSimResult] = useState<SimulationResult | null>(null);
+
+  // If harmonizedData arrives, auto-adjust total budget to match average monthly spend
+  useEffect(() => {
+    if (harmonizedData && harmonizedData.summary.weeksCount > 0) {
+      const avgWeeklySpend = harmonizedData.summary.totalSpend / harmonizedData.summary.weeksCount;
+      const approxMonthly = Math.round((avgWeeklySpend * 4.33) / 5000) * 5000;
+      if (approxMonthly >= 20000 && approxMonthly <= 250000) {
+        setTotalBudget(approxMonthly);
+      }
+    }
+  }, [harmonizedData]);
 
   // Derived search percentage
   const searchPct = Math.max(0, 100 - tvPct - socialPct);
@@ -89,8 +105,8 @@ export const BudgetSimulator: React.FC = () => {
           }}>
             <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span>Current Allocation Controls</span>
-              <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: 500 }}>
-                {simResult?.source === 'backend-fastapi' ? '⚡ FastAPI Active' : '⚡ Local Engine Active'}
+              <span style={{ fontSize: '0.78rem', color: harmonizedData ? '#10B981' : '#64748B', fontWeight: 600 }}>
+                {harmonizedData ? '✓ Calibrated to Ingested Data' : simResult?.source === 'backend-fastapi' ? '⚡ FastAPI Active' : '⚡ Local Engine Active'}
               </span>
             </h3>
 

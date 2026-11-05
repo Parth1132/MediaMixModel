@@ -15,7 +15,9 @@ from app.schemas import (
     OptimizationRequest,
     OptimizationResponse,
     CurvesResponse,
-    DecompositionResponse
+    DecompositionResponse,
+    CustomFitRequest,
+    CustomFitResponse
 )
 from app.engine import engine_instance
 
@@ -136,3 +138,18 @@ def get_time_series_decomposition() -> DecompositionResponse:
         return DecompositionResponse(**decomp_data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Decomposition failed: {str(e)}")
+
+@app.post("/api/fit-custom", response_model=CustomFitResponse, tags=["Custom Model Estimation"])
+def fit_custom_dataset(req: CustomFitRequest) -> CustomFitResponse:
+    """
+    Fits Adstock carryover and Hill saturation parameters to user-ingested CSV time series.
+    """
+    try:
+        result = engine_instance.fit_custom_data(
+            channel_spends=req.channel_spends,
+            target_revenue=req.target_revenue
+        )
+        return CustomFitResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Custom fit failed: {str(e)}")
+

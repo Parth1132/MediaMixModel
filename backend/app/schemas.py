@@ -88,3 +88,17 @@ class DecompositionResponse(BaseModel):
     mape: float
     overall_roas: Dict[str, float]
     fitted_parameters: Dict[str, Dict[str, float]]
+
+class CustomFitRequest(BaseModel):
+    channel_spends: Dict[str, List[float]] = Field(..., description="Map of channel name to weekly spend array")
+    target_revenue: List[float] = Field(..., description="Weekly target revenue array")
+
+class CustomFitResponse(BaseModel):
+    status: str
+    weeks_fitted: int
+    mape: float
+    r_squared: float
+    baseline_level: float
+    fitted_parameters: Dict[str, Dict[str, float]]
+    roas_by_channel: Dict[str, float]
+
